@@ -70,3 +70,11 @@ mcp-publisher publish                                 # из корня репо
 2. Указать URL репозитория `https://github.com/A1-x-Tech/mcp-yandex-merchants`.
    LobeHub сам подтянет README, список инструментов и конфиг установки
    (`npx -y mcp-yandex-merchants`).
+
+## Грабли реестра, выученные 2026-08-09
+
+- Вход по токену **не требует** публичного членства в организации: `mcp-publisher login github --token "$(gh auth token)"` прошёл при скрытом членстве в askads. Заметка выше про публичность актуальна только для device-flow.
+- JWT реестра короткоживущий (протухает примерно за час): перед `publish` после паузы — `mcp-publisher logout && mcp-publisher login github --token "$(gh auth token)"`, иначе 401 «token is expired».
+- Namespace **регистрозависим** и обязан побуквенно совпадать с именем организации на GitHub: `io.github.A1-x-Tech/...`, не `io.github.a1-x-tech/...` — иначе 403 с перечнем доступных namespace.
+- `mcpName` сверяется с уже **опубликованным** npm-тарболлом (посимвольно): опечатка в регистре лечится только патч-релизом npm, правки репозитория недостаточно.
+- Корневой `description` в `server.json` — не длиннее 100 символов, иначе 422 на валидации.
