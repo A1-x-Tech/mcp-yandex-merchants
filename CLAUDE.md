@@ -63,7 +63,8 @@ npm run smoke      # live READ-ONLY call (needs YANDEX_MERCHANTS_OAUTH_TOKEN)
 - **Validate inputs with zod** in `inputSchema` (offer ids ≤ 50 chars, batches ≤ 2000 /
   ≤ 500, ttl ≤ 720). Reuse the shared schema **factories** in `util.ts` (a fresh schema
   per field avoids `$ref` dedup in the JSON schema). Cross-field checks that zod can't
-  express (the 5–95% discount window) live at the top of the handler and fail fast.
+  express (the 5–95% discount window, the `pay_by_price` + `pay_by_condition` pair)
+  live at the top of the handler and fail fast.
 - **Output compact JSON via `ok`** — the consumer is an LLM; pretty-printing burns tokens.
   Responses pass through verbatim (describe the fields in the tool `description`, the only
   place the external model reads).

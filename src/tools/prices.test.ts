@@ -97,6 +97,29 @@ test("set_offer_discount enforces the 5–95% window MCP-side", async () => {
   assert.equal(calls.length, 0, "invalid discounts must not reach the API");
 });
 
+test("set_offer_price rejects half a pay_by pair without calling the API", async () => {
+  const { calls, tools } = harness();
+  const noCondition = await tools.set_offer_price({ feed_id: 1, offer_id: "a", price: 10, pay_by_price: 9 });
+  assert.equal(noCondition.isError, true);
+  assert.match(noCondition.content[0].text, /pay_by_price и pay_by_condition/);
+  const noPrice = await tools.set_offer_price({ feed_id: 1, offer_id: "a", price: 10, pay_by_condition: "yandex_pay" });
+  assert.equal(noPrice.isError, true);
+  assert.equal(calls.length, 0, "half a payBy pair must not reach the API");
+});
+
+test("update_offer_prices rejects half a pay_by pair, naming the offending element", async () => {
+  const { calls, tools } = harness();
+  const res = await tools.update_offer_prices({
+    offers: [
+      { feed_id: 1, offer_id: "a", price: 10 },
+      { feed_id: 1, offer_id: "b", price: 20, pay_by_condition: "ozon_card" },
+    ],
+  });
+  assert.equal(res.isError, true);
+  assert.match(res.content[0].text, /offers\[1\]/);
+  assert.equal(calls.length, 0, "half a payBy pair must not reach the API");
+});
+
 test("a client error is returned as an isError result, not thrown", async () => {
   const { tools } = harness({ throwOn: "updateOfferPrices" });
   const res = await tools.set_offer_price({ feed_id: 1, offer_id: "a", price: 10 });

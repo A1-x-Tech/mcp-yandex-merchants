@@ -34,11 +34,11 @@ export const ttlInHours = () =>
     .max(720)
     .describe("Срок скрытия в часах, максимум 720 (30 дней). Без него предложение скрыто бессрочно.");
 
-/** Payment condition for a special pay-by price. */
+/** Payment condition for a special pay-by price (only alongside pay_by_price). */
 export const payByCondition = () =>
   z
     .enum(["yandex_pay", "fast_payment_system", "ozon_card"])
-    .describe("Условие оплаты для спеццены: yandex_pay, fast_payment_system или ozon_card.");
+    .describe("Условие оплаты для спеццены: yandex_pay, fast_payment_system или ozon_card; только вместе с pay_by_price.");
 
 /** Derives the message `fail` would show — for tools that report errors as data. */
 export function errorMessage(err: unknown): string {
@@ -70,10 +70,11 @@ export const READ_ONLY = {
 } as const;
 
 /**
- * Writes whose repeat has an additional effect (re-hiding with a TTL re-arms
- * the expiry; raw_request can hit anything), so idempotentHint stays false.
- * Nothing this API does is irreversible (hides are undone by show_offers,
- * prices by another update), hence destructiveHint: false.
+ * Writes whose repeat may have an additional effect (the API does not document
+ * repeat-hide semantics — a new TTL could re-arm the expiry; raw_request can
+ * hit anything), so idempotentHint stays false. Nothing this API does is
+ * irreversible (hides are undone by show_offers, prices by another update),
+ * hence destructiveHint: false.
  */
 export const WRITE = {
   readOnlyHint: false,

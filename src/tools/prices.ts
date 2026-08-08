@@ -7,6 +7,14 @@ import { fail, feedId, offerId, ok, payByCondition, price, WRITE_IDEMPOTENT } fr
 const MIN_DISCOUNT_PCT = 5;
 const MAX_DISCOUNT_PCT = 95;
 
+/**
+ * The API's payBy object is `{ price, condition }` — a pair. Half a pair would
+ * go to the API as a malformed payBy, so it is rejected before the request.
+ */
+function halfPayByPair(payByPrice: number | undefined, payByCondition: string | undefined): boolean {
+  return (payByPrice === undefined) !== (payByCondition === undefined);
+}
+
 export function registerPricesTools(server: McpServer, client: MerchantsClient): void {
   server.registerTool(
     "set_offer_price",
@@ -16,7 +24,7 @@ export function registerPricesTools(server: McpServer, client: MerchantsClient):
       description:
         "Изменяет цену одного товарного предложения (POST /offer-prices/updates c одним элементом). Валюта всегда RUR — подставляется автоматически. " +
         "Опционально: discount_base — цена до скидки (покажется зачёркнутой; скидка должна попадать в 5–95%, иначе API вернёт 400), " +
-        "pay_by_price + pay_by_condition — спеццена при условии оплаты. " +
+        "pay_by_price + pay_by_condition (только парой, вместе) — спеццена при условии оплаты. " +
         "Ответ API: { status: \"OK\" } либо { status: \"ERROR\", errors: [{ code, message }] } — проверяйте status. " +
         "Если в фиде несколько предложений с одинаковым id, цена обновится только у первого. Лимит: 50 000 изменений цен в минуту.",
       inputSchema: {
@@ -33,11 +41,14 @@ export function registerPricesTools(server: McpServer, client: MerchantsClient):
           .int()
           .positive()
           .optional()
-          .describe("Спеццена при выполнении условия оплаты (целое, в рублях)."),
+          .describe("Спеццена при выполнении условия оплаты (целое, в рублях); только вместе с pay_by_condition."),
         pay_by_condition: payByCondition().optional(),
       },
     },
     async ({ feed_id, offer_id, price, discount_base, pay_by_price, pay_by_condition }) => {
+      if (halfPayByPair(pay_by_price, pay_by_condition)) {
+        return fail(new Error("pay_by_price и pay_by_condition задаются только вместе (payBy в API — пара { price, condition })."));
+      }
       try {
         return ok(
           await client.updateOfferPrices([
@@ -84,7 +95,7 @@ export function registerPricesTools(server: McpServer, client: MerchantsClient):
                 .int()
                 .positive()
                 .optional()
-                .describe("Спеццена при выполнении условия оплаты (целое, в рублях)."),
+                .describe("Спеццена при выполнении условия оплаты (целое, в рублях); только вместе с pay_by_condition."),
               pay_by_condition: payByCondition().optional(),
             }),
           )
@@ -94,6 +105,12 @@ export function registerPricesTools(server: McpServer, client: MerchantsClient):
       },
     },
     async ({ offers }) => {
+      const half = offers.findIndex((o) => halfPayByPair(o.pay_by_price, o.pay_by_condition));
+      if (half !== -1) {
+        return fail(
+          new Error(`offers[${half}]: pay_by_price и pay_by_condition задаются только вместе (payBy в API — пара { price, condition }).`),
+        );
+      }
       try {
         return ok(
           await client.updateOfferPrices(

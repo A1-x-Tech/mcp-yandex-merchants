@@ -11,7 +11,7 @@ export function registerHiddenTools(server: McpServer, client: MerchantsClient):
       annotations: WRITE,
       description:
         "Скрывает одно предложение из Поиска по товарам (POST /hidden-offers), например когда товар закончился. " +
-        "ttl_in_hours — необязательный срок скрытия в часах (максимум 720 = 30 дней, иначе ошибка INVALID_TTL); повторное скрытие с ttl перезапускает срок. " +
+        "ttl_in_hours — необязательный срок скрытия в часах (максимум 720 = 30 дней, иначе ошибка INVALID_TTL); что делает повторное скрытие с новым ttl, дока API не описывает. " +
         "Без ttl предложение скрыто до явного show_offers. Ответ API: { status: \"OK\" } либо { status: \"ERROR\", errors: [{ code, message }] }. " +
         "Прочитать список уже скрытых предложений через API нельзя. Лимит: 50 000 операций скрытия/показа в минуту.",
       inputSchema: {

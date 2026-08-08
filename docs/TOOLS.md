@@ -18,7 +18,7 @@ This is a **write API**: besides the feeds-info wrappers every tool mutates stat
 
 | Tool | Description |
 |---|---|
-| `set_offer_price` | Updates the price of a single offer (`POST /offer-prices/updates` with one element). Optional `discount_base` (struck-through pre-discount price, 5–95% discount enforced by the API) and `pay_by_price` + `pay_by_condition` (`yandex_pay` / `fast_payment_system` / `ozon_card`). If the feed has several offers with the same id, only the first one is updated. |
+| `set_offer_price` | Updates the price of a single offer (`POST /offer-prices/updates` with one element). Optional `discount_base` (struck-through pre-discount price, 5–95% discount enforced by the API) and `pay_by_price` + `pay_by_condition` (`yandex_pay` / `fast_payment_system` / `ozon_card`; the pair is all-or-nothing — the wire `payBy` is `{ price, condition }`). If the feed has several offers with the same id, only the first one is updated. |
 | `update_offer_prices` | Bulk price update: 1–2000 offers per request. Error codes: `DUPLICATE_OFFER`, `INVALID_FEED_ID`, `INVALID_OFFER_ID`, `LIMIT_EXCEEDED`, `REQUEST_LIMIT_EXCEEDED` (> 2000 per request). Rate limit: 50 000 price changes per minute. |
 | `set_offer_discount` | Sets a discount: `price` (discounted) + mandatory `discount_base` (old, struck-through). The 5–95% window is validated MCP-side before the request (the API would answer 400 otherwise). |
 
@@ -26,7 +26,7 @@ This is a **write API**: besides the feeds-info wrappers every tool mutates stat
 
 | Tool | Description |
 |---|---|
-| `hide_offer` | Hides one offer from search (`POST /hidden-offers`), e.g. when it is out of stock. Optional `ttl_in_hours` ≤ 720 (30 days; `INVALID_TTL` otherwise); re-hiding with a TTL re-arms the expiry. Without a TTL the offer stays hidden until `show_offers`. |
+| `hide_offer` | Hides one offer from search (`POST /hidden-offers`), e.g. when it is out of stock. Optional `ttl_in_hours` ≤ 720 (30 days; `INVALID_TTL` otherwise); what a repeat hide with a new TTL does is undocumented (treated as non-idempotent here). Without a TTL the offer stays hidden until `show_offers`. |
 | `hide_offers` | Bulk hide: 1–500 offers per request, one shared `ttl_in_hours`. Error codes: `DUPLICATE_OFFER`, `INVALID_FEED_ID`, `INVALID_OFFER_ID`, `INVALID_TTL`, `LIMIT_EXCEEDED`, `REQUEST_LIMIT_EXCEEDED` (> 500 per request). |
 | `show_offers` | Unhides 1–500 previously hidden offers (`DELETE /hidden-offers` with a JSON body). |
 

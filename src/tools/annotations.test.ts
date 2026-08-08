@@ -33,8 +33,9 @@ const ANN = collectAnnotations();
 
 /**
  * The pinned map tool → expected hints. This is a WRITE API: only the
- * feeds-info wrappers are read-only; hides (TTL re-arm) and raw_request are
- * non-idempotent writes; price sets and unhide are state-setting writes.
+ * feeds-info wrappers are read-only; hides (repeat-with-TTL semantics are
+ * undocumented) and raw_request are non-idempotent writes; price sets and
+ * unhide are state-setting writes.
  */
 const EXPECTED: Record<string, Annotations> = {
   list_feeds: READ_ONLY,
