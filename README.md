@@ -1,2 +1,5 @@
 # mcp-yandex-merchants
-MCP-сервер для Яндекс Товаров (merchants.yandex.ru) — фиды, товарные предложения и цены. Для Claude, Cursor, Codex и других AI-клиентов.
+
+MCP-сервер для [Яндекс Товаров](https://merchants.yandex.ru) — управление фидами, товарными предложениями и ценами из Claude, Cursor, Codex и других AI-клиентов.
+
+> 🚧 В разработке.
