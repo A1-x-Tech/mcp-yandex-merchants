@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-yandex-merchants"
+version = "0.0.1"
+description = "MCP-сервер для Яндекс Товаров (merchants.yandex.ru) — фиды, товарные предложения и цены. Для Claude, Cursor, Codex и других AI-клиентов."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "gistrec", email = "gistrec@gmail.com" }]
+keywords = ["mcp", "yandex", "merchants", "e-commerce"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/A1-x-Tech/mcp-yandex-merchants"
+Repository = "https://github.com/A1-x-Tech/mcp-yandex-merchants"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_yandex_merchants"]

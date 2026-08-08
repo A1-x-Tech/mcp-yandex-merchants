@@ -1,0 +1,23 @@
+{
+  "name": "mcp-yandex-merchants",
+  "version": "0.0.1",
+  "description": "MCP-сервер для Яндекс Товаров (merchants.yandex.ru) — фиды, товарные предложения и цены. Для Claude, Cursor, Codex и других AI-клиентов.",
+  "keywords": ["mcp", "model-context-protocol", "yandex", "yandex-merchants", "e-commerce", "claude", "cursor", "codex"],
+  "homepage": "https://github.com/A1-x-Tech/mcp-yandex-merchants#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/A1-x-Tech/mcp-yandex-merchants.git"
+  },
+  "license": "MIT",
+  "author": "gistrec <gistrec@gmail.com>",
+  "type": "module",
+  "bin": {
+    "mcp-yandex-merchants": "index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
