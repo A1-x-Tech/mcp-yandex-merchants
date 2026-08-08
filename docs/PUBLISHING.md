@@ -13,7 +13,7 @@ Claude, Cursor, LobeHub и др. Канонический источник — *
 - `server.json` → `packages[0].version`.
 
 А `mcpName` в `package.json` должен совпадать с `name` в `server.json`
-(`io.github.a1-x-tech/mcp-yandex-merchants`). Проверка перед публикацией — все три
+(`io.github.A1-x-Tech/mcp-yandex-merchants`). Проверка перед публикацией — все три
 должны напечатать один и тот же `X.Y.Z`:
 
 ```bash
@@ -59,7 +59,7 @@ mcp-publisher publish                                 # из корня репо
 
 ### Что проверяет реестр
 
-- **Namespace** — имя `io.github.a1-x-tech/*` подтверждается входом под GitHub-аккаунтом с
+- **Namespace** — имя `io.github.A1-x-Tech/*` подтверждается входом под GitHub-аккаунтом с
   доступом к организации `A1-x-Tech`.
 - **Владение npm-пакетом** — в опубликованном `package.json` поле `mcpName` должно
   совпадать с `name` из `server.json`. Пакет с `mcpName` уже должен быть в npm.

@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.a1-x-tech/mcp-yandex-merchants",
+  "name": "io.github.A1-x-Tech/mcp-yandex-merchants",
   "title": "Yandex Merchants MCP",
-  "description": "MCP server for the Yandex Merchants partner API: feed info, offer price updates, discounts, hiding and unhiding offers.",
+  "description": "MCP server for the Yandex Merchants partner API: feeds, offer prices, discounts, hide/unhide.",
   "websiteUrl": "https://github.com/A1-x-Tech/mcp-yandex-merchants#readme",
   "repository": {
     "url": "https://github.com/A1-x-Tech/mcp-yandex-merchants",

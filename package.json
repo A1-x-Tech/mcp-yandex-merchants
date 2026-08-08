@@ -2,7 +2,7 @@
   "name": "mcp-yandex-merchants",
   "version": "0.1.0",
   "description": "MCP server for the Yandex Merchants (Яндекс Товары) partner API — feed info, offer price updates, discounts, hiding and unhiding offers for AI agents.",
-  "mcpName": "io.github.a1-x-tech/mcp-yandex-merchants",
+  "mcpName": "io.github.A1-x-Tech/mcp-yandex-merchants",
   "type": "module",
   "bin": {
     "mcp-yandex-merchants": "dist/index.js"
