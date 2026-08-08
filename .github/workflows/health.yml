@@ -1,0 +1,34 @@
+name: Health check
+
+# End-to-end read-only check against the live Yandex Merchants partner API
+# (yandex.ru/products/api/ext/partner). Auth is a long-lived Yandex OAuth token (scope
+# products:partner-api) stored as a repo secret — no per-run minting. smoke makes NO writes
+# (lists the feeds available to the token). Runs daily + manual dispatch only (never on
+# push/PR), so secrets aren't exposed to PRs/forks.
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    if: github.repository == 'A1-x-Tech/mcp-yandex-merchants'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+      - run: npm ci
+      - name: Read-only smoke check
+        run: npm run smoke
+        env:
+          YANDEX_MERCHANTS_OAUTH_TOKEN: ${{ secrets.YANDEX_MERCHANTS_OAUTH_TOKEN }}

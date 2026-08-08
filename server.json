@@ -1,0 +1,49 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.a1-x-tech/mcp-yandex-merchants",
+  "title": "Yandex Merchants MCP",
+  "description": "MCP server for the Yandex Merchants partner API: feed info, offer price updates, discounts, hiding and unhiding offers.",
+  "websiteUrl": "https://github.com/A1-x-Tech/mcp-yandex-merchants#readme",
+  "repository": {
+    "url": "https://github.com/A1-x-Tech/mcp-yandex-merchants",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "mcp-yandex-merchants",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "YANDEX_MERCHANTS_OAUTH_TOKEN",
+          "description": "Yandex OAuth token with the products:partner-api scope, obtained under the login that uploaded the feed. Treat it as a secret.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "YANDEX_MERCHANTS_BASE_URL",
+          "description": "API root override.",
+          "isRequired": false,
+          "default": "https://yandex.ru/products/api/ext/partner"
+        },
+        {
+          "name": "YANDEX_MERCHANTS_TIMEOUT_MS",
+          "description": "Per-request timeout in milliseconds.",
+          "isRequired": false,
+          "default": "60000"
+        },
+        {
+          "name": "YANDEX_MERCHANTS_MAX_RETRIES",
+          "description": "Retries on transient errors (429 always; 5xx/network for GET only).",
+          "isRequired": false,
+          "default": "3"
+        }
+      ]
+    }
+  ]
+}
