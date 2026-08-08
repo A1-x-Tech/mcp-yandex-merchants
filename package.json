@@ -1,23 +1,58 @@
 {
   "name": "mcp-yandex-merchants",
-  "version": "0.0.1",
-  "description": "MCP-сервер для Яндекс Товаров (merchants.yandex.ru) — фиды, товарные предложения и цены. Для Claude, Cursor, Codex и других AI-клиентов.",
-  "keywords": ["mcp", "model-context-protocol", "yandex", "yandex-merchants", "e-commerce", "claude", "cursor", "codex"],
-  "homepage": "https://github.com/A1-x-Tech/mcp-yandex-merchants#readme",
+  "version": "0.1.0",
+  "description": "MCP server for the Yandex Merchants (Яндекс Товары) partner API — feed info, offer price updates, discounts, hiding and unhiding offers for AI agents.",
+  "mcpName": "io.github.a1-x-tech/mcp-yandex-merchants",
+  "type": "module",
+  "bin": {
+    "mcp-yandex-merchants": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "test"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "smoke": "node --import tsx src/smoke.ts",
+    "test": "npm run test:src && npm run test:dist",
+    "test:src": "node --import tsx --test $(find src -name '*.test.ts')",
+    "test:dist": "npm run build && node --test test/dist-smoke.test.js",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "yandex",
+    "yandex-merchants",
+    "yandex-products",
+    "e-commerce",
+    "product-feed",
+    "price-management"
+  ],
+  "license": "MIT",
+  "author": "Aleksandr Kovalko",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/A1-x-Tech/mcp-yandex-merchants.git"
   },
-  "license": "MIT",
-  "author": "gistrec <gistrec@gmail.com>",
-  "type": "module",
-  "bin": {
-    "mcp-yandex-merchants": "index.js"
+  "homepage": "https://github.com/A1-x-Tech/mcp-yandex-merchants#readme",
+  "bugs": {
+    "url": "https://github.com/A1-x-Tech/mcp-yandex-merchants/issues"
   },
-  "files": [
-    "index.js"
-  ],
-  "engines": {
-    "node": ">=18"
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^5.7.0"
   }
 }
