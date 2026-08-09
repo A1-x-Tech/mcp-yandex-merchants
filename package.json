@@ -8,6 +8,7 @@
     "mcp-yandex-merchants": "dist/index.js"
   },
   "files": [
+    "assets",
     "dist",
     "test"
   ],
