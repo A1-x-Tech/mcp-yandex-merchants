@@ -21,6 +21,8 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     if: github.repository == 'A1-x-Tech/mcp-yandex-merchants'
+    env:
+      YANDEX_MERCHANTS_OAUTH_TOKEN: ${{ secrets.YANDEX_MERCHANTS_OAUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,6 +31,8 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Read-only smoke check
+        if: env.YANDEX_MERCHANTS_OAUTH_TOKEN != ''
         run: npm run smoke
-        env:
-          YANDEX_MERCHANTS_OAUTH_TOKEN: ${{ secrets.YANDEX_MERCHANTS_OAUTH_TOKEN }}
+      - name: Skipped (no secrets configured)
+        if: env.YANDEX_MERCHANTS_OAUTH_TOKEN == ''
+        run: echo "YANDEX_MERCHANTS_OAUTH_TOKEN secret is not set — live smoke skipped."
