@@ -2,6 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/mcp-yandex-merchants)](https://www.npmjs.com/package/mcp-yandex-merchants)
 [![CI](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml/badge.svg)](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml)
+[![Glama](https://glama.ai/mcp/servers/A1-x-Tech/mcp-yandex-merchants/badges/score.svg)](https://glama.ai/mcp/servers/A1-x-Tech/mcp-yandex-merchants)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 <img src="./assets/a1-logo.svg" alt="A1" width="22">&nbsp;**Яндекс Товары MCP** — MCP-сервер, с которым Claude, Cursor, Codex и другие AI-клиенты обновляют цены, скидки и видимость офферов в [Яндекс Товарах](https://merchants.yandex.ru) по обычной команде. Он работает поверх уже загруженного YML-фида: для точечного изменения не нужно редактировать и повторно отправлять весь файл.
