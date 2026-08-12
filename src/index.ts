@@ -11,6 +11,29 @@ import { registerPricesTools } from "./tools/prices.js";
 import { registerHiddenTools } from "./tools/hidden.js";
 import { registerRawTool } from "./tools/raw.js";
 
+/**
+ * Prose handed to the calling model in the MCP `initialize` result, before it
+ * picks a tool. Deliberately NOT a summary of the tool list (the model already
+ * has every name, description and schema): only what the tool list cannot say —
+ * which product this is, what the API refuses to do, what an ambiguous write
+ * costs here, and which failures mean something other than what they look like.
+ * Russian, like every tool description in this server; prepended to every
+ * session, so it stays dense and factual.
+ */
+const INSTRUCTIONS =
+  "Это партнёрский API Яндекс Товаров: точечная правка уже загруженного YML-фида, а не Яндекс " +
+  "Маркет и не кабинет — заказов, остатков и карточек тут нет, фид создаётся и удаляется только в " +
+  "кабинете или Вебмастере. API почти только пишет: читается лишь список фидов (feedId, feedUrl) — " +
+  "текущую цену, состав фида и скрытые предложения узнать нечем, ведите учёт изменений сами. HTTP " +
+  "200 — ещё не успех: проверяйте поле status в теле ответа (\"OK\" либо \"ERROR\" с errors). Потолок: " +
+  "50 000 изменений цен и 50 000 скрытий/показов в минуту. Запись после 5xx или обрыва не " +
+  "повторяется автоматически (429 — повторяется с задержкой): исход такого вызова неизвестен, а " +
+  "перечитать состояние нечем — повторяйте осознанно. Пустой список фидов или ошибка доступа обычно " +
+  "значит не «фидов нет», а токен не того логина (нужен тот, под которым загружен фид), отсутствие " +
+  "scope products:partner-api либо только что подтверждённые права в Вебмастере — доступ " +
+  "открывается через несколько часов. Всё, кроме check_access, list_feeds и raw_request с GET, " +
+  "пишет в боевой аккаунт; feed_id берите из list_feeds.";
+
 /** Reads the package version so the server reports its real version to MCP clients. */
 function readVersion(): string {
   try {
@@ -46,10 +69,15 @@ async function main(): Promise<void> {
   const config = await loadConfigOrExit(telemetry);
   const client = new MerchantsClient(config);
 
-  const server = new McpServer({
-    name: "mcp-yandex-merchants",
-    version: readVersion(),
-  });
+  // `instructions` rides in the server options (second argument) and surfaces as
+  // the top-level `instructions` of the initialize result.
+  const server = new McpServer(
+    {
+      name: "mcp-yandex-merchants",
+      version: readVersion(),
+    },
+    { instructions: INSTRUCTIONS },
+  );
 
   instrumentToolCalls(server, telemetry);
   server.server.oninitialized = () => {

@@ -80,7 +80,7 @@ test("dist registers the expected tools", () => {
   assert.deepEqual(names.sort(), ALL_TOOLS);
 });
 
-test("dist server completes a real MCP handshake over stdio and lists all tools", async () => {
+test("dist server completes a real MCP handshake over stdio, lists all tools and hands over instructions", async () => {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [new URL("../dist/index.js", import.meta.url).pathname],
@@ -97,6 +97,14 @@ test("dist server completes a real MCP handshake over stdio and lists all tools"
     assert.deepEqual(tools.map((t) => t.name).sort(), ALL_TOOLS);
     const serverInfo = mcp.getServerVersion();
     assert.equal(serverInfo?.name, "mcp-yandex-merchants");
+
+    // instructions live only in the initialize result, so this live handshake is
+    // the only place that proves they survived the build. Length floor instead of
+    // a wording match: catches an empty or placeholder string without pinning the
+    // test to the prose.
+    const instructions = mcp.getInstructions();
+    assert.equal(typeof instructions, "string");
+    assert.ok(instructions.trim().length > 200, "instructions must carry real guidance");
   } finally {
     await mcp.close();
   }
