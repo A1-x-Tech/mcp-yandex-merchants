@@ -79,11 +79,9 @@
 
 **Через интерфейс приложения:**
 
-1. Откройте **Settings → MCP servers**.
-2. Нажмите **Add server** и выберите **STDIO**.
-3. Укажите имя `yandex-merchants`, команду `npx` и аргументы `-y`, `mcp-yandex-merchants@latest`.
-4. Добавьте переменную окружения `YANDEX_MERCHANTS_OAUTH_TOKEN` со своим токеном.
-5. Сохраните сервер и нажмите **Restart**.
+1. Откройте **Settings → Plugins → MCP servers**.
+2. Нажмите **Add server**.
+3. Добавьте команду запуска `npx -y mcp-yandex-merchants@latest` и переменную окружения `YANDEX_MERCHANTS_OAUTH_TOKEN` со своим токеном.
 
 **Через командную строку:**
 
@@ -99,7 +97,7 @@ codex mcp add yandex-merchants \
 codex mcp list
 ```
 
-[Официальная инструкция Codex](https://developers.openai.com/codex/mcp/)
+[Официальная инструкция Codex](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 
 </details>
 
