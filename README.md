@@ -1,11 +1,11 @@
-# Меняйте цены и видимость товаров обычной командой — без пересборки YML-фида
+# <img src="./assets/a1-logo.svg" alt="A1" width="40"> Яндекс Товары MCP — меняйте цены и видимость без пересборки YML-фида
 
 [![npm](https://img.shields.io/npm/v/mcp-yandex-merchants)](https://www.npmjs.com/package/mcp-yandex-merchants)
 [![CI](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml/badge.svg)](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml)
 [![Glama](https://glama.ai/mcp/servers/A1-x-Tech/mcp-yandex-merchants/badges/score.svg)](https://glama.ai/mcp/servers/A1-x-Tech/mcp-yandex-merchants)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-<img src="./assets/a1-logo.svg" alt="A1" width="22">&nbsp;**Яндекс Товары MCP** — MCP-сервер, с которым Claude, Cursor, Codex и другие AI-клиенты обновляют цены, скидки и видимость офферов в [Яндекс Товарах](https://merchants.yandex.ru) по обычной команде. Он работает поверх уже загруженного YML-фида: для точечного изменения не нужно редактировать и повторно отправлять весь файл.
+**Яндекс Товары MCP** — MCP-сервер, с которым Claude, Cursor, Codex и другие AI-клиенты обновляют цены, скидки и видимость офферов в [Яндекс Товарах](https://merchants.yandex.ru) по обычной команде. Он работает поверх уже загруженного YML-фида: для точечного изменения не нужно редактировать и повторно отправлять весь файл.
 
 - **9 готовых инструментов.** Проверка доступа, список фидов, цены, скидки, скрытие, возобновление показа и универсальный `raw_request`.
 - **Один товар или большая выборка.** До 2 000 изменений цен и до 500 скрытий или возвратов в одном запросе.
@@ -172,10 +172,21 @@ codex mcp add yandex-merchants \
 <br>
 
 ```bash
-claude mcp add yandex-merchants \
-  -e YANDEX_MERCHANTS_OAUTH_TOKEN=ваш_токен \
+claude mcp add \
+  --env YANDEX_MERCHANTS_OAUTH_TOKEN=ваш_токен \
+  --transport stdio \
+  --scope user \
+  yandex-merchants \
   -- npx -y mcp-yandex-merchants@latest
 ```
+
+Проверьте подключение:
+
+```bash
+claude mcp list
+```
+
+[Официальная инструкция Claude Code](https://code.claude.com/docs/en/mcp)
 
 </details>
 
@@ -184,7 +195,9 @@ claude mcp add yandex-merchants \
 
 <br>
 
-Откройте `claude_desktop_config.json`: на macOS он находится в `~/Library/Application Support/Claude/`, на Windows — в `%APPDATA%\Claude\`.
+1. Откройте Claude Desktop и перейдите в **Settings → Developer**.
+2. Нажмите **Edit Config**. Claude откроет файл настроек в текстовом редакторе.
+3. Добавьте сервер в `mcpServers`:
 
 ```json
 {
@@ -199,6 +212,13 @@ claude mcp add yandex-merchants \
   }
 }
 ```
+
+Если кнопки **Edit Config** нет, откройте файл напрямую:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+[Официальная инструкция Claude Desktop](https://claude.com/docs/connectors/building/mcp-apps/getting-started)
 
 </details>
 
@@ -207,34 +227,14 @@ claude mcp add yandex-merchants \
 
 <br>
 
-Добавьте сервер в `~/.cursor/mcp.json` или в `.cursor/mcp.json` проекта:
+Пользовательский локальный сервер добавляется в Cursor через файл `mcp.json`:
+
+- macOS и Linux: `~/.cursor/mcp.json`
+- Windows: `%USERPROFILE%\.cursor\mcp.json`
 
 ```json
 {
   "mcpServers": {
-    "yandex-merchants": {
-      "command": "npx",
-      "args": ["-y", "mcp-yandex-merchants@latest"],
-      "env": {
-        "YANDEX_MERCHANTS_OAUTH_TOKEN": "ваш_токен"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>VS Code</strong></summary>
-
-<br>
-
-Создайте `.vscode/mcp.json`. Здесь используется ключ `servers`, а не `mcpServers`:
-
-```json
-{
-  "servers": {
     "yandex-merchants": {
       "type": "stdio",
       "command": "npx",
@@ -246,6 +246,44 @@ claude mcp add yandex-merchants \
   }
 }
 ```
+
+[Официальная инструкция Cursor](https://cursor.com/docs/mcp)
+
+</details>
+
+<details>
+<summary><strong>VS Code</strong></summary>
+
+<br>
+
+Откройте палитру команд и выполните **MCP: Open User Configuration**. VS Code создаст пользовательский файл MCP. Добавьте в него:
+
+```json
+{
+  "servers": {
+    "yandex-merchants": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-yandex-merchants@latest"],
+      "env": {
+        "YANDEX_MERCHANTS_OAUTH_TOKEN": "${input:yandex_merchants_token}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "yandex_merchants_token",
+      "description": "OAuth-токен Яндекс Товаров",
+      "password": true
+    }
+  ]
+}
+```
+
+Проверьте сервер командой **MCP: List Servers**.
+
+[Официальная инструкция VS Code](https://code.visualstudio.com/docs/agent-customization/mcp-servers)
 
 </details>
 
@@ -301,6 +339,7 @@ ASKADS_TELEMETRY=0
 - **Ограничены батчи.** До 2 000 цен и до 500 скрытий или возобновлений показа в одном запросе.
 - **Rate limits.** До 50 000 изменений цен в минуту и суммарно до 50 000 скрытий и возобновлений показа в минуту.
 - **Нет автоматического отката.** После сетевого обрыва у записи может не быть однозначного результата, а проверить его чтением через этот API нельзя.
+- **Нет постоянного наблюдения.** Сервер работает во время вызова из AI-приложения и сам не следит за фидами в фоне. Если ваше приложение поддерживает задания по расписанию, попросите его периодически проверять доступ или выполнять нужный сценарий.
 
 ## Документация и разработка
 
@@ -310,20 +349,6 @@ ASKADS_TELEMETRY=0
 - [npm-пакет](https://www.npmjs.com/package/mcp-yandex-merchants) — опубликованная версия `mcp-yandex-merchants`.
 - [API Яндекс Товаров](https://yandex.ru/dev/products/doc/ru/) — официальная документация.
 
-Проверить проект локально:
-
-```bash
-npm install
-npm run typecheck
-npm test
-```
-
-Тесты не обращаются к сети. `npm run smoke` — отдельная живая read-only проверка с реальным токеном.
-
 ## Помощь и обратная связь
 
 Нашли ошибку или не хватает сценария? [Создайте issue](https://github.com/A1-x-Tech/mcp-yandex-merchants/issues) или напишите в Telegram: [@gistrec](https://t.me/gistrec).
-
-## Лицензия
-
-MIT — см. [LICENSE](LICENSE).
