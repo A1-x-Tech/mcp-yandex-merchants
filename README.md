@@ -373,4 +373,4 @@ ASKADS_TELEMETRY=0
 
 ## Помощь и обратная связь
 
-Нашли ошибку или не хватает сценария? [Создайте issue](https://github.com/A1-x-Tech/mcp-yandex-merchants/issues) или напишите в Telegram: [@gistrec](https://t.me/gistrec).
+Нашли ошибку или не хватает сценария? [Создайте issue](https://github.com/A1-x-Tech/mcp-yandex-merchants/issues) или напишите в [Telegram](https://t.me/a1_mcp).
