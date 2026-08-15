@@ -1,12 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ConfigError, loadConfig } from "./config.js";
+import { loadConfig } from "./config.js";
 
-/**
- * The reason codes below are the vocabulary the dashboard groups by — renaming
- * one silently splits a bar in two, so they are pinned here.
- */
 function withEnv(vars: Record<string, string | undefined>, run: () => void): void {
   const saved = new Map(Object.keys(vars).map((k) => [k, process.env[k]]));
   for (const [k, v] of Object.entries(vars)) {
@@ -23,17 +19,25 @@ function withEnv(vars: Record<string, string | undefined>, run: () => void): voi
   }
 }
 
-test("a missing OAuth token reports missing_token", () => {
-  let caught: unknown;
-  withEnv({ YANDEX_MERCHANTS_OAUTH_TOKEN: undefined }, () => {
-    try {
-      loadConfig();
-    } catch (err) {
-      caught = err;
-    }
+/**
+ * A missing token used to throw, which killed the process before the MCP
+ * handshake and left the user with a dead server and no reason. It is now a
+ * survivable state: the server starts, answers initialize/tools/list, and the
+ * client raises CredentialsError at call time (pinned in client.test.ts).
+ * Pinned here because reverting it would restore that dead end.
+ */
+test("a missing OAuth token does not throw — the server must start degraded", () => {
+  withEnv({ YANDEX_MERCHANTS_OAUTH_TOKEN: undefined, YANDEX_MERCHANTS_BASE_URL: undefined }, () => {
+    const config = loadConfig();
+    assert.equal(config.token, undefined);
+    assert.equal(config.apiBase, "https://yandex.ru/products/api/ext/partner");
   });
-  assert.ok(caught instanceof ConfigError, "config problems must throw ConfigError, not exit");
-  assert.equal(caught.reason, "missing_token");
+});
+
+test("an empty value is treated as absent, not as an empty credential", () => {
+  withEnv({ YANDEX_MERCHANTS_OAUTH_TOKEN: "" }, () => {
+    assert.equal(loadConfig().token, undefined);
+  });
 });
 
 test("a configured server loads with the default base and numeric defaults", () => {
