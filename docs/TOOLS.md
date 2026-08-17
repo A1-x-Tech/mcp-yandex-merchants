@@ -1,5 +1,7 @@
 # Tools
 
+For task-oriented guidance, open the [MCP capability catalog](./capabilities/index.md). This page remains the technical reference for schemas and API responses.
+
 This is a **write API**: besides the feeds-info wrappers every tool mutates state
 (prices, hidden offers). Inputs are normalized snake_case (`feed_id`, `offer_id`,
 `ttl_in_hours`); the client maps them to the API's wire shape
