@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { AuthRequiredError, NOT_CONNECTED_MESSAGE, TokenStore } from "./auth.js";
 import { credentialsPath, readCredentials, writeCredentials } from "./credentials.js";
@@ -71,6 +71,17 @@ test("the credentials file is owner-only", async () => {
   });
 });
 
+test("saving leaves exactly one file behind — no temp leftovers from the atomic write", async () => {
+  await withTempConfig(() => {
+    // Twice: the second write goes over an existing file, the branch where a
+    // non-atomic truncate-in-place used to be the risk.
+    writeCredentials({ access_token: "one", obtained_at: Date.now() });
+    const file = writeCredentials({ access_token: "two", obtained_at: Date.now() });
+    assert.deepEqual(readdirSync(dirname(file)), ["credentials.json"]);
+    assert.equal(readCredentials()?.access_token, "two");
+  });
+});
+
 test("a truncated credentials file reads as 'not connected', not as an empty token", async () => {
   await withTempConfig(() => {
     writeCredentials({ access_token: "x", obtained_at: Date.now() });
@@ -99,6 +110,29 @@ test("an expired token is refreshed transparently and the new one is stored", as
     assert.equal(await store.getToken(), "new");
     assert.equal(readCredentials()?.access_token, "new");
     assert.equal(readCredentials()?.refresh_token, "rt2", "the rotated refresh token must persist");
+  });
+});
+
+test("a refresh answer without a refresh_token keeps the stored one", async () => {
+  await withTempConfig(async () => {
+    writeCredentials({
+      access_token: "old",
+      refresh_token: "rt",
+      expires_at: Date.now() - 1000,
+      obtained_at: Date.now() - 100_000,
+    });
+    // Yandex is allowed to omit refresh_token on refresh; persisting that
+    // verbatim would strand the user at the next expiry.
+    const fetchImpl = (async () =>
+      ({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ access_token: "new", expires_in: 3600 }),
+      }) as unknown as Response) as unknown as typeof fetch;
+
+    const store = new TokenStore(undefined, fetchImpl);
+    assert.equal(await store.getToken(), "new");
+    assert.equal(readCredentials()?.refresh_token, "rt", "the old refresh token must survive");
   });
 });
 

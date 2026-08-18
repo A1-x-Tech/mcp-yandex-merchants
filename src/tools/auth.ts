@@ -9,7 +9,7 @@ import {
   pendingLogin,
   startLogin,
 } from "../oauth.js";
-import { fail, ok, READ_ONLY, WRITE_DELETE, WRITE_IDEMPOTENT } from "./util.js";
+import { errorMessage, fail, ok, READ_ONLY, WRITE_DELETE, WRITE_IDEMPOTENT } from "./util.js";
 
 /**
  * The in-chat login. Two steps because the user has to leave for the browser in
@@ -100,8 +100,25 @@ export function registerAuthTools(
         // Prove it works before telling the user it does: a token that
         // authenticates but sees no feeds is a wrong-login token (the API shows
         // feeds only to the login that uploaded them), and saying "готово" there
-        // just moves the confusion one step later.
-        const feedsInfo = (await client.feedsInfo()) as { feeds?: unknown };
+        // just moves the confusion one step later. But the login itself already
+        // succeeded — the token is saved — so a failure of this *verification*
+        // call must not come back as isError: that would read as a failed login
+        // and send the user to re-run start_login for nothing.
+        let feedsInfo: { feeds?: unknown };
+        try {
+          feedsInfo = (await client.feedsInfo()) as { feeds?: unknown };
+        } catch (verifyError) {
+          return ok({
+            connected: true,
+            storedAt: tokens.status().path,
+            grantedScope: response.scope,
+            note:
+              "Токен получен и сохранён, вход выполнен. " +
+              `Проверочный вызов к API не удался: ${errorMessage(verifyError)}. ` +
+              "Скорее всего, подключение работает — попробуйте любой инструмент данных; " +
+              "если ошибка повторится, это проблема доступа токена, а не входа.",
+          });
+        }
         const found = Array.isArray(feedsInfo.feeds) ? feedsInfo.feeds.length : 0;
 
         return ok({

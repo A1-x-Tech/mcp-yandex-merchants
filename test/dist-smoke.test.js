@@ -198,6 +198,9 @@ test("dist start_login hands back a PKCE authorize URL without touching the netw
     assert.equal(url.searchParams.get("code_challenge_method"), "S256");
     assert.equal(url.searchParams.get("response_type"), "code");
     assert.ok(!url.search.includes("client_secret"), "a public client must not leak a secret");
+    // No redirect ever comes back to this process, so there is no session for
+    // state to tie together — PKCE alone binds the pasted code to the verifier.
+    assert.equal(url.searchParams.get("state"), null, "the URL must not carry an unchecked state");
   } finally {
     await mcp.close();
   }
