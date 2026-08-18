@@ -7,7 +7,9 @@ info (`GET /feeds-info`), price updates (`POST /offer-prices/updates`), hiding
 `raw_request` is the escape hatch. The server talks to
 `https://yandex.ru/products/api/ext/partner`; auth is a Yandex OAuth token with
 the `products:partner-api` scope, sent as `Authorization: OAuth <token>` — the
-token must belong to the login that uploaded the YML feed.
+token must belong to the login that uploaded the YML feed. The token comes from
+the in-chat login (`start_login`/`finish_login`, stored on disk) or from
+`YANDEX_MERCHANTS_OAUTH_TOKEN` (which wins).
 
 ## Commands
 
@@ -22,33 +24,53 @@ npm run smoke      # live READ-ONLY call (needs YANDEX_MERCHANTS_OAUTH_TOKEN)
 ## Architecture
 
 - `src/config.ts` — env → config. A missing `YANDEX_MERCHANTS_OAUTH_TOKEN` is NOT an
-  error: the field stays `undefined`, the server starts degraded and the client raises
-  `CredentialsError` at call time. `ConfigError` (with a `reason` code) is reserved for
+  error: the field stays `undefined`, the server starts anyway and the token is resolved
+  per request (env → stored login); with neither source the client raises
+  `AuthRequiredError` at call time. `ConfigError` (with a `reason` code) is reserved for
   malformed values, caught by `loadConfigOrDegraded` in `index.ts` (no such checks exist
   today). Optional `YANDEX_MERCHANTS_BASE_URL`, `YANDEX_MERCHANTS_TIMEOUT_MS`,
   `YANDEX_MERCHANTS_MAX_RETRIES`.
+- `src/oauth.ts` — the OAuth flow: PKCE pair (S256), authorize URL against
+  `https://oauth.yandex.ru/verification_code`, code exchange and refresh, explicit
+  `scope=products:partner-api` + `force_confirm=yes`. **No `client_secret`** — this is a
+  public client («Яндекс Товары — A1-x-Tech MCP», overridable via
+  `YANDEX_MERCHANTS_OAUTH_CLIENT_ID`), and a secret inside an npm package would protect
+  nothing. The pending verifier lives in one module-level slot (one stdio server = one
+  user); a second `start_login` replaces it.
+- `src/credentials.ts` — `~/.config/mcp-yandex-merchants/credentials.json`, mode `0600`.
+  An unparsable file reads as "not connected", never as an empty token.
+- `src/auth.ts` — `TokenStore`: resolves the token per request (env wins over stored),
+  refreshes on expiry, and raises `AuthRequiredError` whose *message* is the product —
+  it is the only text the user ever sees about a missing token, and it names both fixes
+  (`start_login` in the chat, or the env var + restart). It replaced the former
+  `CredentialsError`.
 - `src/client.ts` — maps each logical call (`feedsInfo`/`updateOfferPrices`/`hideOffers`/
-  `showOffers`) to its endpoint: `OAuth` auth, the price wire shape
+  `showOffers`) to its endpoint: `OAuth` auth resolved per request via `TokenStore`, the
+  price wire shape
   (`{ feed: { id }, id, price: { currencyId: "RUR", value, discountBase?, payBy? } }`),
-  `hiddenOffers` with `ttlInHours` stamped onto every element. `request()` first rejects
-  a missing token with `CredentialsError` (before building the request, the retries and
-  fetch — the message is the product: it names the variable to set and the needed
-  restart), then resolves the path against the base and rejects any path that escapes to
-  a foreign origin (SSRF guard), retries 429 always but 5xx/network **only for GET** (a
-  502 after a write commits could duplicate it), enforces an AbortController timeout that
+  `hiddenOffers` with `ttlInHours` stamped onto every element. `request()` rethrows
+  `AuthRequiredError` before the retries and before fetch (a missing setup is not
+  transport trouble), resolves the path against the base and rejects any path that
+  escapes to a foreign origin (SSRF guard), retries 429 always but 5xx/network **only
+  for GET** (a 502 after a write commits could duplicate it), re-mints a stored token
+  once on 401 (403 stays out: here it means a wrong login or unconfirmed Webmaster
+  rights, which a fresh token cannot fix), enforces an AbortController timeout that
   also covers reading the body, and throws `MerchantsError(status, body)`.
-- `src/tools/feeds.ts` — `list_feeds`, `check_access` (diagnostics: failures come back
-  as `{ ok: false, error }` data, not `isError`). `src/tools/prices.ts` —
-  `set_offer_price`, `update_offer_prices`, `set_offer_discount` (validates the 5–95%
-  window before the request). `src/tools/hidden.ts` — `hide_offer`, `hide_offers`,
-  `show_offers`. `src/tools/raw.ts` — `raw_request` (GET/POST/DELETE, not read-only).
-  `src/tools/util.ts` — `ok`/`fail`/`errorMessage`, the `READ_ONLY`/`WRITE`/
-  `WRITE_IDEMPOTENT` annotations and shared zod schema factories (`feedId`, `offerId`,
-  `price`, `ttlInHours`, `payByCondition`).
+- `src/tools/auth.ts` — `auth_status`, `start_login`, `finish_login` (verifies the new
+  token with a live feeds-info call and warns when it sees zero feeds — a wrong-login
+  token), `logout`. `src/tools/feeds.ts` — `list_feeds`, `check_access` (diagnostics:
+  failures come back as `{ ok: false, error }` data, not `isError`).
+  `src/tools/prices.ts` — `set_offer_price`, `update_offer_prices`, `set_offer_discount`
+  (validates the 5–95% window before the request). `src/tools/hidden.ts` — `hide_offer`,
+  `hide_offers`, `show_offers`. `src/tools/raw.ts` — `raw_request` (GET/POST/DELETE, not
+  read-only). `src/tools/util.ts` — `ok`/`fail`/`errorMessage`, the `READ_ONLY`/`WRITE`/
+  `WRITE_IDEMPOTENT`/`WRITE_DELETE` annotations and shared zod schema factories
+  (`feedId`, `offerId`, `price`, `ttlInHours`, `payByCondition`).
 - `src/index.ts` — wires every `register*` into the McpServer. `loadConfigOrDegraded`
-  starts the server even on a config problem; without a token the initialize
-  `instructions` open with the unconfigured prefix (set `YANDEX_MERCHANTS_OAUTH_TOKEN`
-  and restart).
+  starts the server even on a config problem; `connected = tokens.hasToken()` is read
+  once, only to pick the instructions text — without a token the initialize
+  `instructions` open with the unconfigured prefix (log in via `start_login`, or set
+  `YANDEX_MERCHANTS_OAUTH_TOKEN` and restart).
 - `src/telemetry.ts` — anonymous usage pings (ids/names/versions only, never data or
   arguments; fire-and-forget, must never block or throw; opt-out `ASKADS_TELEMETRY=0`).
   `server_start` means "a usable install started"; an install without a token sends
@@ -62,14 +84,19 @@ npm run smoke      # live READ-ONLY call (needs YANDEX_MERCHANTS_OAUTH_TOKEN)
   leaves the user with a red cross and no reason — the sibling Metrica server's telemetry
   showed that state accounted for nearly every unconfigured install. A missing token is a
   survivable state: start, answer `initialize`/`tools/list` (with the unconfigured prefix
-  in the instructions), and reject tool calls with `CredentialsError`. There are no login
-  tools: the token comes only from the environment, so the fix is the operator setting
-  `YANDEX_MERCHANTS_OAUTH_TOKEN` and restarting the server. `config.test.ts`,
-  `client.test.ts` and `test/dist-smoke.test.js` pin this.
-- **Credential failures are not transport failures.** `CredentialsError` is thrown before
+  in the instructions), serve the login tools, and reject data calls with
+  `AuthRequiredError`. The fix is either the in-chat login (`start_login` →
+  `finish_login`, no restart) or the operator setting `YANDEX_MERCHANTS_OAUTH_TOKEN` and
+  restarting the server. `config.test.ts`, `client.test.ts` and
+  `test/dist-smoke.test.js` pin this.
+- **Auth failures are not transport failures.** `AuthRequiredError` is rethrown before
   the retry/backoff branch (and before fetch) in `request()` — retrying it burns seconds
   of backoff before the user sees the one message that helps. Pinned by "fetch must not
-  be called" assertions in `client.test.ts`.
+  be called" and timing assertions in `client.test.ts`.
+- **The token is resolved per request, never cached on the client.** That is what makes
+  `finish_login` take effect mid-session without a client restart. env wins over the
+  stored login (an explicitly configured install and CI behave exactly as before);
+  `logout` removes only the stored file and never touches the env token.
 - **This is a write API — annotate honestly.** Only the feeds-info wrappers are
   `READ_ONLY`; price/unhide tools are `WRITE_IDEMPOTENT`, hides and `raw_request` are
   `WRITE`. `annotations.test.ts` pins the full tool → hints map.

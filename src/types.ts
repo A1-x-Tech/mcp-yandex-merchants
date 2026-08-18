@@ -16,8 +16,9 @@ export interface MerchantsConfig {
   /**
    * Yandex OAuth token (scope products:partner-api), sent as `OAuth`. Treated
    * as a secret. Absent when YANDEX_MERCHANTS_OAUTH_TOKEN is not set — the
-   * server still starts (degraded) and the client raises `CredentialsError`
-   * at call time instead.
+   * server still starts, the token is then resolved per request from the
+   * stored in-chat login, and with neither source the client raises
+   * `AuthRequiredError` at call time.
    */
   token?: string;
   /** API root URL. Defaults to https://yandex.ru/products/api/ext/partner. */

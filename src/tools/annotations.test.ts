@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { registerAuthTools } from "./auth.js";
 import { registerFeedsTools } from "./feeds.js";
 import { registerPricesTools } from "./prices.js";
 import { registerHiddenTools } from "./hidden.js";
 import { registerRawTool } from "./raw.js";
-import { READ_ONLY, WRITE, WRITE_IDEMPOTENT } from "./util.js";
+import { READ_ONLY, WRITE, WRITE_DELETE, WRITE_IDEMPOTENT } from "./util.js";
 
 interface Annotations {
   readOnlyHint?: boolean;
@@ -21,7 +22,8 @@ function collectAnnotations(): Record<string, Annotations | undefined> {
       annotations[name] = cfg.annotations;
     },
   };
-  // Registration reads the client only inside handlers, so a stub is fine here.
+  // Registration reads the client/store only inside handlers, so stubs are fine here.
+  registerAuthTools(server as never, {} as never, {} as never);
   registerFeedsTools(server as never, {} as never);
   registerPricesTools(server as never, {} as never);
   registerHiddenTools(server as never, {} as never);
@@ -33,11 +35,17 @@ const ANN = collectAnnotations();
 
 /**
  * The pinned map tool → expected hints. This is a WRITE API: only the
- * feeds-info wrappers are read-only; hides (repeat-with-TTL semantics are
- * undocumented) and raw_request are non-idempotent writes; price sets and
- * unhide are state-setting writes.
+ * feeds-info wrappers and the local auth lookups are read-only; hides
+ * (repeat-with-TTL semantics are undocumented) and raw_request are
+ * non-idempotent writes; price sets and unhide are state-setting writes.
+ * finish_login re-writes the same credentials file (state-setting); logout
+ * deletes a login the user has to re-establish — the one destructive hint.
  */
 const EXPECTED: Record<string, Annotations> = {
+  auth_status: READ_ONLY,
+  start_login: READ_ONLY,
+  finish_login: WRITE_IDEMPOTENT,
+  logout: WRITE_DELETE,
   list_feeds: READ_ONLY,
   check_access: READ_ONLY,
   set_offer_price: WRITE_IDEMPOTENT,
@@ -49,7 +57,7 @@ const EXPECTED: Record<string, Annotations> = {
   raw_request: WRITE,
 };
 
-test("registers all nine tools with annotations", () => {
+test("registers all thirteen tools with annotations", () => {
   assert.deepEqual(Object.keys(ANN).sort(), Object.keys(EXPECTED).sort());
   for (const [name, a] of Object.entries(ANN)) {
     assert.ok(a, `${name} is missing annotations`);
@@ -66,8 +74,9 @@ test("no write tool masquerades as read-only", () => {
   for (const [name, a] of Object.entries(ANN)) {
     const shouldBeReadOnly = EXPECTED[name] === READ_ONLY;
     assert.equal(a?.readOnlyHint, shouldBeReadOnly, `${name} readOnlyHint`);
-    // Nothing in this API is irreversible — destructiveHint stays false everywhere.
-    assert.equal(a?.destructiveHint, false, `${name} destructiveHint`);
+    // Nothing this API writes is irreversible — the single destructive hint is
+    // logout, which removes the stored login from disk.
+    assert.equal(a?.destructiveHint, name === "logout", `${name} destructiveHint`);
     assert.equal(a?.openWorldHint, true, `${name} openWorldHint`);
   }
 });

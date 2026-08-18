@@ -2,10 +2,12 @@
 import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { TokenStore } from "./auth.js";
 import { MerchantsClient } from "./client.js";
 import { ConfigError, DEFAULT_BASE, loadConfig } from "./config.js";
 import { instrumentToolCalls, Telemetry } from "./telemetry.js";
 import type { MerchantsConfig } from "./types.js";
+import { registerAuthTools } from "./tools/auth.js";
 import { registerFeedsTools } from "./tools/feeds.js";
 import { registerPricesTools } from "./tools/prices.js";
 import { registerHiddenTools } from "./tools/hidden.js";
@@ -35,18 +37,18 @@ const INSTRUCTIONS =
   "пишет в боевой аккаунт; feed_id берите из list_feeds.";
 
 /**
- * Prepended to INSTRUCTIONS when the token is missing. The model reads this
+ * Prepended to INSTRUCTIONS when no token is available. The model reads this
  * before it picks a tool, so an unconfigured session opens with the fix rather
- * than with a failed call. There is no in-chat login here: the token comes only
- * from the environment, so the fix is an operator action + restart.
+ * than with a failed call.
  */
 const UNCONFIGURED_PREFIX =
-  "ВНИМАНИЕ: Яндекс Товары ещё не подключены — не задана переменная окружения " +
-  "YANDEX_MERCHANTS_OAUTH_TOKEN, поэтому любой вызов инструмента вернёт ошибку. Подключиться из " +
-  "диалога нельзя: оператор должен задать YANDEX_MERCHANTS_OAUTH_TOKEN (OAuth-токен Яндекса со " +
-  "scope products:partner-api — доступ «API поиска по товарам» приложения на oauth.yandex.ru, " +
-  "токен получен под тем логином, который загрузил YML-фид) в конфигурации MCP-клиента и " +
-  "перезапустить сервер. ";
+  "ВНИМАНИЕ: Яндекс Товары ещё не подключены — токена нет, поэтому любой инструмент данных " +
+  "вернёт ошибку. Подключение делается прямо в диалоге и без перезапуска клиента: вызовите " +
+  "start_login, покажите пользователю ссылку, попросите войти строго под тем логином Яндекса, " +
+  "под которым загружен YML-фид (токен другого логина не увидит ни одного фида), и прислать " +
+  "код подтверждения, затем передайте код в finish_login. Альтернатива — задать " +
+  "YANDEX_MERCHANTS_OAUTH_TOKEN (OAuth-токен со scope products:partner-api под логином, " +
+  "загрузившим фид) в конфигурации MCP-клиента и перезапустить сервер. ";
 
 /** Reads the package version so the server reports its real version to MCP clients. */
 function readVersion(): string {
@@ -91,12 +93,12 @@ async function main(): Promise<void> {
   // problem can be reported; wired to the server before tools register.
   const telemetry = new Telemetry(readVersion());
   const { config, problem } = loadConfigOrDegraded(telemetry);
-  const client = new MerchantsClient(config);
+  const tokens = new TokenStore(config.token);
+  const client = new MerchantsClient(config, tokens);
 
-  // Decided once, at startup: the token comes only from the environment, so an
-  // unconfigured start stays unconfigured until the operator sets the variable
-  // and restarts the server — "restart" is the accurate advice to give.
-  const connected = Boolean(config.token);
+  // Resolved once, at startup, only to pick the instructions text: the token
+  // itself is re-read per request, so a login mid-session still takes effect.
+  const connected = tokens.hasToken();
 
   // `instructions` rides in the server options (second argument) and surfaces as
   // the top-level `instructions` of the initialize result.
@@ -122,6 +124,7 @@ async function main(): Promise<void> {
     else telemetry.send("unconfigured_start", { reason: problem?.reason ?? "missing_token" });
   };
 
+  registerAuthTools(server, client, tokens);
   registerFeedsTools(server, client);
   registerPricesTools(server, client);
   registerHiddenTools(server, client);
@@ -131,7 +134,7 @@ async function main(): Promise<void> {
   await server.connect(transport);
   console.error(
     `mcp-yandex-merchants running on stdio${
-      connected ? "" : " (no YANDEX_MERCHANTS_OAUTH_TOKEN — set the variable and restart)"
+      connected ? "" : " (no token — log in via start_login or set YANDEX_MERCHANTS_OAUTH_TOKEN)"
     }`,
   );
 }

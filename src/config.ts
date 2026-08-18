@@ -22,45 +22,16 @@ export class ConfigError extends Error {
 }
 
 /**
- * What a tool call without a token reads. The first sentence is the historical
- * startup error, verbatim (pinned in client.test.ts) — the rest exists because
- * the token comes only from the environment, so the fix is an operator action
- * plus a restart, never a retry.
- */
-export const MISSING_CREDENTIALS_MESSAGE =
-  "YANDEX_MERCHANTS_OAUTH_TOKEN is required (Yandex OAuth token with the products:partner-api " +
-  "scope, obtained under the login that uploaded the feed). " +
-  "This is not a network failure and retrying will not help: the operator must set this " +
-  "environment variable in the MCP client's server config and restart the server — it is read " +
-  "only at startup.";
-
-/**
- * Raised when a tool call needs the OAuth token and none was configured. The
- * message is the whole point of the class: it is the only text the calling
- * model reads about the missing setup, so it names the fix (which variable,
- * and that a restart is needed) instead of describing the failure. The client
- * throws it before building the request — a missing token is a configuration
- * problem, not transport trouble, so it must never enter the retry/backoff
- * branch or reach fetch.
- */
-export class CredentialsError extends Error {
-  constructor(message: string = MISSING_CREDENTIALS_MESSAGE) {
-    super(message);
-    this.name = "CredentialsError";
-  }
-}
-
-/**
  * Builds the client config from environment variables.
  *
- * A missing token is NOT an error here: the server starts anyway and the client
- * raises {@link CredentialsError} on the first tool call, so an unconfigured
- * install completes the MCP handshake and carries the fix into the session
- * instead of dying before `initialize` with nothing to read. There is no
- * in-chat login for an OAuth token: the fix is the operator setting the
- * variable and restarting the server.
+ * A missing token is NOT an error here: the server starts anyway and the token
+ * is resolved per request (env → stored credentials), so an unconfigured
+ * install can log in from the chat (`start_login` → `finish_login`) instead of
+ * dying before the MCP handshake. When neither source has a token, the client
+ * raises `AuthRequiredError` (src/auth.ts) at call time — its message carries
+ * both fixes: the in-chat login and the env var.
  *
- *   YANDEX_MERCHANTS_OAUTH_TOKEN  Yandex OAuth token, scope products:partner-api
+ *   YANDEX_MERCHANTS_OAUTH_TOKEN  Yandex OAuth token, scope products:partner-api (optional; wins over the stored login)
  *   YANDEX_MERCHANTS_BASE_URL     API root override (default https://yandex.ru/products/api/ext/partner)
  *   YANDEX_MERCHANTS_TIMEOUT_MS   per-request timeout (default 60000)
  *   YANDEX_MERCHANTS_MAX_RETRIES  retries on transient errors (default 3)

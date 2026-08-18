@@ -1,6 +1,6 @@
+import { AuthRequiredError, TokenStore } from "./auth.js";
 import type { MerchantsConfig, PayByCondition } from "./types.js";
 import { MerchantsError } from "./types.js";
-import { CredentialsError } from "./config.js";
 
 export type HttpMethod = "GET" | "POST" | "DELETE";
 
@@ -32,16 +32,28 @@ export class MerchantsClient {
   private readonly maxRetries: number;
   private readonly retryBaseMs: number;
 
-  constructor(private readonly config: MerchantsConfig) {
+  private readonly tokens: TokenStore;
+
+  constructor(
+    private readonly config: MerchantsConfig,
+    tokens?: TokenStore,
+  ) {
     this.base = config.apiBase.endsWith("/") ? config.apiBase : config.apiBase + "/";
     this.timeoutMs = config.timeoutMs ?? 60_000;
     this.maxRetries = config.maxRetries ?? 3;
     this.retryBaseMs = config.retryBaseMs ?? 500;
+    // Default store keeps the old contract for callers that pass a plain config
+    // (tests, smoke): config.token wins, stored credentials are the fallback.
+    this.tokens = tokens ?? new TokenStore(config.token);
   }
 
-  private headers(hasBody: boolean): Record<string, string> {
+  /**
+   * Resolved per request, never cached on the instance: `finish_login` writes a
+   * new token to disk mid-session and the very next call has to pick it up.
+   */
+  private async headers(hasBody: boolean): Promise<Record<string, string>> {
     const h: Record<string, string> = {
-      Authorization: `OAuth ${this.config.token}`,
+      Authorization: `OAuth ${await this.tokens.getToken()}`,
     };
     if (hasBody) h["Content-Type"] = "application/json";
     return h;
@@ -82,7 +94,8 @@ export class MerchantsClient {
 
   /**
    * Low-level request to a Merchants partner API path (e.g. "feeds-info").
-   * With no token configured, throws {@link CredentialsError} BEFORE any fetch —
+   * The token is resolved per request via {@link TokenStore}; with no token
+   * available anywhere it throws {@link AuthRequiredError} BEFORE any fetch —
    * a missing setup must never enter the retry/backoff loop, because no amount
    * of retrying mints credentials. Retries 429 always; 5xx and network
    * errors/timeouts only for GET — this is a write API, and a 502 after a
@@ -90,12 +103,6 @@ export class MerchantsClient {
    * {@link MerchantsError}.
    */
   async request<T = unknown>(method: HttpMethod, path: string, body?: Record<string, unknown>): Promise<T> {
-    // A missing token is rejected before the request is built, retried or
-    // sent: it is a configuration problem, not transport trouble, so it must
-    // never enter the retry/backoff branch below — and fetch never fires
-    // without auth (pinned in client.test.ts).
-    if (!this.config.token) throw new CredentialsError();
-
     // Guard method !== "GET" keeps undici from crashing on a GET-with-body.
     const hasBody = body !== undefined && method !== "GET";
 
@@ -112,6 +119,9 @@ export class MerchantsClient {
     // write endpoints happen to be state-setting (same price / same hide), but
     // the API does not document dedup, so 5xx/network retries stay gated.
     const idempotent = method === "GET";
+    // A stored token can be revoked (or die early) long before its stated expiry,
+    // and only the API knows: one silent re-mint + replay per request, then give up.
+    let refreshed = false;
 
     for (let attempt = 0; ; attempt++) {
       let res: Response;
@@ -121,12 +131,17 @@ export class MerchantsClient {
           target,
           {
             method,
-            headers: this.headers(hasBody),
+            headers: await this.headers(hasBody),
             body: hasBody ? JSON.stringify(body) : undefined,
           },
           path,
         ));
       } catch (err) {
+        // "Not connected" is raised while building the auth header, inside this
+        // try — but it is not transport trouble: retrying burns the full backoff
+        // (seconds) before the user sees the one message that would help them,
+        // and fetch must never fire without auth (pinned in client.test.ts).
+        if (err instanceof AuthRequiredError) throw err;
         // Network error or timeout: retry idempotent requests with backoff; on the
         // last attempt (or a non-idempotent method) rethrow the original error.
         if (idempotent && attempt < this.maxRetries) {
@@ -148,6 +163,27 @@ export class MerchantsClient {
           data = JSON.parse(text);
         } catch {
           data = text;
+        }
+      }
+
+      // 401 is the one failure a re-mint can fix (revoked/expired stored token).
+      // A 403 stays out on purpose: here it means a wrong login or rights not
+      // yet confirmed in Webmaster — a fresh token of the same login changes
+      // nothing. The retry budget above is for transport trouble, not this.
+      if (!res.ok && !refreshed && res.status === 401 && this.tokens.canRefresh()) {
+        refreshed = true;
+        try {
+          await this.tokens.refresh();
+          attempt--;
+          continue;
+        } catch (err) {
+          // Refresh itself failed (revoked in Yandex ID, network down): surface the
+          // actionable message instead of the original 401.
+          if (err instanceof AuthRequiredError) throw err;
+          throw new AuthRequiredError(
+            `Не удалось обновить токен Яндекс Товаров: ${err instanceof Error ? err.message : String(err)}. ` +
+              "Вызовите start_login и подключитесь заново.",
+          );
         }
       }
 

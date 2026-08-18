@@ -88,3 +88,16 @@ export const WRITE_IDEMPOTENT = {
   ...WRITE,
   idempotentHint: true,
 } as const;
+
+/**
+ * Deletes something the user may want back — today only `logout`, which removes
+ * the stored login from disk. The only destructive hint in this server: API
+ * writes are all reversible (hides are undone by show_offers, prices by another
+ * update), but a deleted login has to be re-established by the user.
+ */
+export const WRITE_DELETE = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
+  openWorldHint: true,
+} as const;
