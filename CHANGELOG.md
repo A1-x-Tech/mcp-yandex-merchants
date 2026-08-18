@@ -5,6 +5,12 @@
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версионирование — [SemVer](https://semver.org/lang/ru/).
 
+## [1.1.1] — 2026-08-19
+
+### Изменено
+
+- README: единая структура по образцу mcp-yandex-metrica, без gif.
+
 ## [1.1.0] — 2026-08-19
 
 ### Добавлено
