@@ -1,5 +1,6 @@
 import type { MerchantsConfig, PayByCondition } from "./types.js";
 import { MerchantsError } from "./types.js";
+import { CredentialsError } from "./config.js";
 
 export type HttpMethod = "GET" | "POST" | "DELETE";
 
@@ -81,11 +82,20 @@ export class MerchantsClient {
 
   /**
    * Low-level request to a Merchants partner API path (e.g. "feeds-info").
-   * Retries 429 always; 5xx and network errors/timeouts only for GET — this is
-   * a write API, and a 502 after a POST/DELETE commits could duplicate the
-   * write. Any other non-2xx throws a {@link MerchantsError}.
+   * With no token configured, throws {@link CredentialsError} BEFORE any fetch —
+   * a missing setup must never enter the retry/backoff loop, because no amount
+   * of retrying mints credentials. Retries 429 always; 5xx and network
+   * errors/timeouts only for GET — this is a write API, and a 502 after a
+   * POST/DELETE commits could duplicate the write. Any other non-2xx throws a
+   * {@link MerchantsError}.
    */
   async request<T = unknown>(method: HttpMethod, path: string, body?: Record<string, unknown>): Promise<T> {
+    // A missing token is rejected before the request is built, retried or
+    // sent: it is a configuration problem, not transport trouble, so it must
+    // never enter the retry/backoff branch below — and fetch never fires
+    // without auth (pinned in client.test.ts).
+    if (!this.config.token) throw new CredentialsError();
+
     // Guard method !== "GET" keeps undici from crashing on a GET-with-body.
     const hasBody = body !== undefined && method !== "GET";
 

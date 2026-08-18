@@ -21,18 +21,22 @@ npm run smoke      # live READ-ONLY call (needs YANDEX_MERCHANTS_OAUTH_TOKEN)
 
 ## Architecture
 
-- `src/config.ts` — env → config; throws `ConfigError` (with a `reason` code) instead of
-  exiting, so `index.ts` can report the drop-off before dying.
-  Requires `YANDEX_MERCHANTS_OAUTH_TOKEN`; optional `YANDEX_MERCHANTS_BASE_URL`,
-  `YANDEX_MERCHANTS_TIMEOUT_MS`, `YANDEX_MERCHANTS_MAX_RETRIES`.
+- `src/config.ts` — env → config. A missing `YANDEX_MERCHANTS_OAUTH_TOKEN` is NOT an
+  error: the field stays `undefined`, the server starts degraded and the client raises
+  `CredentialsError` at call time. `ConfigError` (with a `reason` code) is reserved for
+  malformed values, caught by `loadConfigOrDegraded` in `index.ts` (no such checks exist
+  today). Optional `YANDEX_MERCHANTS_BASE_URL`, `YANDEX_MERCHANTS_TIMEOUT_MS`,
+  `YANDEX_MERCHANTS_MAX_RETRIES`.
 - `src/client.ts` — maps each logical call (`feedsInfo`/`updateOfferPrices`/`hideOffers`/
   `showOffers`) to its endpoint: `OAuth` auth, the price wire shape
   (`{ feed: { id }, id, price: { currencyId: "RUR", value, discountBase?, payBy? } }`),
-  `hiddenOffers` with `ttlInHours` stamped onto every element. `request()` resolves the
-  path against the base and rejects any path that escapes to a foreign origin (SSRF
-  guard), retries 429 always but 5xx/network **only for GET** (a 502 after a write
-  commits could duplicate it), enforces an AbortController timeout that also covers
-  reading the body, and throws `MerchantsError(status, body)`.
+  `hiddenOffers` with `ttlInHours` stamped onto every element. `request()` first rejects
+  a missing token with `CredentialsError` (before building the request, the retries and
+  fetch — the message is the product: it names the variable to set and the needed
+  restart), then resolves the path against the base and rejects any path that escapes to
+  a foreign origin (SSRF guard), retries 429 always but 5xx/network **only for GET** (a
+  502 after a write commits could duplicate it), enforces an AbortController timeout that
+  also covers reading the body, and throws `MerchantsError(status, body)`.
 - `src/tools/feeds.ts` — `list_feeds`, `check_access` (diagnostics: failures come back
   as `{ ok: false, error }` data, not `isError`). `src/tools/prices.ts` —
   `set_offer_price`, `update_offer_prices`, `set_offer_discount` (validates the 5–95%
@@ -41,15 +45,31 @@ npm run smoke      # live READ-ONLY call (needs YANDEX_MERCHANTS_OAUTH_TOKEN)
   `src/tools/util.ts` — `ok`/`fail`/`errorMessage`, the `READ_ONLY`/`WRITE`/
   `WRITE_IDEMPOTENT` annotations and shared zod schema factories (`feedId`, `offerId`,
   `price`, `ttlInHours`, `payByCondition`).
-- `src/index.ts` — wires every `register*` into the McpServer.
+- `src/index.ts` — wires every `register*` into the McpServer. `loadConfigOrDegraded`
+  starts the server even on a config problem; without a token the initialize
+  `instructions` open with the unconfigured prefix (set `YANDEX_MERCHANTS_OAUTH_TOKEN`
+  and restart).
 - `src/telemetry.ts` — anonymous usage pings (ids/names/versions only, never data or
   arguments; fire-and-forget, must never block or throw; opt-out `ASKADS_TELEMETRY=0`).
-  `startup_failed` is the exception: `sendBlocking` awaits it, because the caller
-  exits right after and a fire-and-forget ping would die in flight. Its `reason`
-  is a closed vocabulary (`missing_token`) — never a variable's name or value.
+  `server_start` means "a usable install started"; an install without a token sends
+  `unconfigured_start` instead. The `reason` is a closed vocabulary (`missing_token`) —
+  never a variable's name or value. `startup_failed` remains for a config unusable at
+  load time (malformed values), also fire-and-forget.
 
 ## Conventions (do not break)
 
+- **Never exit because of configuration.** A server that dies before the MCP handshake
+  leaves the user with a red cross and no reason — the sibling Metrica server's telemetry
+  showed that state accounted for nearly every unconfigured install. A missing token is a
+  survivable state: start, answer `initialize`/`tools/list` (with the unconfigured prefix
+  in the instructions), and reject tool calls with `CredentialsError`. There are no login
+  tools: the token comes only from the environment, so the fix is the operator setting
+  `YANDEX_MERCHANTS_OAUTH_TOKEN` and restarting the server. `config.test.ts`,
+  `client.test.ts` and `test/dist-smoke.test.js` pin this.
+- **Credential failures are not transport failures.** `CredentialsError` is thrown before
+  the retry/backoff branch (and before fetch) in `request()` — retrying it burns seconds
+  of backoff before the user sees the one message that helps. Pinned by "fetch must not
+  be called" assertions in `client.test.ts`.
 - **This is a write API — annotate honestly.** Only the feeds-info wrappers are
   `READ_ONLY`; price/unhide tools are `WRITE_IDEMPOTENT`, hides and `raw_request` are
   `WRITE`. `annotations.test.ts` pins the full tool → hints map.

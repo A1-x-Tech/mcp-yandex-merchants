@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MerchantsClient } from "./client.js";
+import { CredentialsError, MISSING_CREDENTIALS_MESSAGE } from "./config.js";
 import type { MerchantsConfig } from "./types.js";
 
 const BASE = "https://yandex.ru/products/api/ext/partner";
@@ -327,6 +328,56 @@ test("a same-origin base override keeps paths relative to it", async () => {
   try {
     await makeClient({ apiBase: "http://127.0.0.1:8080/mock" }).feedsInfo();
     assert.equal(mock.calls[0].url, "http://127.0.0.1:8080/mock/feeds-info");
+  } finally {
+    mock.restore();
+  }
+});
+
+// --- Missing credentials (degraded start) ---
+
+/**
+ * The degraded-start contract: a server without a token still runs, so the
+ * client must fail the call itself — with the exact actionable message, before
+ * any fetch. Zero fetch calls proves the error skips the retry/backoff loop
+ * (maxRetries is deliberately non-zero here).
+ */
+test("no token: CredentialsError with the exact text, fetch never called", async () => {
+  const mock = mockFetch(() => new Response("{}", { status: 200 }));
+  try {
+    const client = new MerchantsClient({ apiBase: BASE, maxRetries: 3, retryBaseMs: 0 });
+    await assert.rejects(
+      () => client.feedsInfo(),
+      (err: unknown) => {
+        assert.ok(err instanceof CredentialsError, "must be a CredentialsError");
+        assert.equal((err as Error).name, "CredentialsError");
+        assert.equal((err as Error).message, MISSING_CREDENTIALS_MESSAGE);
+        // The historical startup error, verbatim — the message is the product.
+        assert.ok(
+          (err as Error).message.startsWith(
+            "YANDEX_MERCHANTS_OAUTH_TOKEN is required (Yandex OAuth token with the " +
+              "products:partner-api scope, obtained under the login that uploaded the feed).",
+          ),
+          "the message must open with the historical startup error, verbatim",
+        );
+        assert.match((err as Error).message, /restart the server/, "the fix must mention the restart");
+        return true;
+      },
+    );
+    assert.equal(mock.calls.length, 0, "must not fetch at all — no retries, no backoff");
+  } finally {
+    mock.restore();
+  }
+});
+
+test("a write without a token is rejected the same way, before fetch", async () => {
+  const mock = mockFetch(() => new Response("{}", { status: 200 }));
+  try {
+    const client = new MerchantsClient({ apiBase: BASE, maxRetries: 3, retryBaseMs: 0 });
+    await assert.rejects(
+      () => client.updateOfferPrices([{ feedId: 1, offerId: "x", price: 1 }]),
+      (err: unknown) => err instanceof CredentialsError,
+    );
+    assert.equal(mock.calls.length, 0, "fetch must not be called without credentials");
   } finally {
     mock.restore();
   }

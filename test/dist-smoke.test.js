@@ -109,3 +109,49 @@ test("dist server completes a real MCP handshake over stdio, lists all tools and
     await mcp.close();
   }
 });
+
+/**
+ * The degraded-start contract: without a token the server used to exit(1)
+ * before the handshake, leaving the client a dead server and no reason. It must
+ * now start, list every tool, open the instructions with the fix, and answer a
+ * tool call with the actionable error — offline: the CredentialsError fires
+ * before any fetch, so this test never touches the network.
+ */
+test("dist server starts without a token: handshake, tool list, actionable call error", async () => {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key, value]) => value !== undefined && !key.startsWith("YANDEX_MERCHANTS_"),
+    ),
+  );
+  env.ASKADS_TELEMETRY = "0"; // keep the suite offline
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [new URL("../dist/index.js", import.meta.url).pathname],
+    env,
+  });
+  const mcp = new Client({ name: "dist-smoke-unconfigured", version: "0.0.0" });
+  try {
+    await mcp.connect(transport);
+
+    // The model must read the fix before it picks a tool.
+    const instructions = mcp.getInstructions() ?? "";
+    assert.match(instructions, /YANDEX_MERCHANTS_OAUTH_TOKEN/, "instructions must name the variable to set");
+    assert.match(instructions, /перезапустить сервер/, "and say the server needs a restart");
+
+    const { tools } = await mcp.listTools();
+    assert.deepEqual(tools.map((t) => t.name).sort(), ALL_TOOLS);
+
+    // A tool call fails with the exact message instead of killing the server.
+    const result = await mcp.callTool({ name: "list_feeds", arguments: {} });
+    assert.equal(result.isError, true, "the call must fail, not the connection");
+    const text = result.content.map((c) => c.text ?? "").join(" ");
+    assert.match(
+      text,
+      /YANDEX_MERCHANTS_OAUTH_TOKEN is required \(Yandex OAuth token with the products:partner-api scope, obtained under the login that uploaded the feed\)\./,
+      "the error must open with the historical startup text, verbatim",
+    );
+    assert.match(text, /restart the server/, "the fix must mention the restart");
+  } finally {
+    await mcp.close();
+  }
+});
