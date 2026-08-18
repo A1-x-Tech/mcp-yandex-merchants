@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { AuthRequiredError, NOT_CONNECTED_MESSAGE } from "./auth.js";
 import { MerchantsClient } from "./client.js";
-import { CredentialsError, MISSING_CREDENTIALS_MESSAGE } from "./config.js";
+import { writeCredentials } from "./credentials.js";
 import type { MerchantsConfig } from "./types.js";
 
 const BASE = "https://yandex.ru/products/api/ext/partner";
@@ -333,52 +337,145 @@ test("a same-origin base override keeps paths relative to it", async () => {
   }
 });
 
-// --- Missing credentials (degraded start) ---
+// --- Missing credentials (degraded start) & the in-chat login ---
+
+/** Points XDG_CONFIG_HOME at a fresh temp dir so the developer's own stored login never leaks in. */
+function withTempConfigDir(): { dir: string; restore: () => void } {
+  const saved = process.env.XDG_CONFIG_HOME;
+  const dir = mkdtempSync(join(tmpdir(), "mcp-merchants-client-"));
+  process.env.XDG_CONFIG_HOME = dir;
+  return {
+    dir,
+    restore() {
+      if (saved === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = saved;
+    },
+  };
+}
 
 /**
  * The degraded-start contract: a server without a token still runs, so the
  * client must fail the call itself — with the exact actionable message, before
  * any fetch. Zero fetch calls proves the error skips the retry/backoff loop
- * (maxRetries is deliberately non-zero here).
+ * (maxRetries is deliberately non-zero here), and the timing assertion proves
+ * it was not treated as transport trouble.
  */
-test("no token: CredentialsError with the exact text, fetch never called", async () => {
+test("no token anywhere: AuthRequiredError with the exact text, fetch never called", async () => {
+  const tempConfig = withTempConfigDir();
   const mock = mockFetch(() => new Response("{}", { status: 200 }));
   try {
-    const client = new MerchantsClient({ apiBase: BASE, maxRetries: 3, retryBaseMs: 0 });
+    const client = new MerchantsClient({ apiBase: BASE, maxRetries: 5, retryBaseMs: 1000 });
+    const started = Date.now();
     await assert.rejects(
       () => client.feedsInfo(),
       (err: unknown) => {
-        assert.ok(err instanceof CredentialsError, "must be a CredentialsError");
-        assert.equal((err as Error).name, "CredentialsError");
-        assert.equal((err as Error).message, MISSING_CREDENTIALS_MESSAGE);
-        // The historical startup error, verbatim — the message is the product.
-        assert.ok(
-          (err as Error).message.startsWith(
-            "YANDEX_MERCHANTS_OAUTH_TOKEN is required (Yandex OAuth token with the " +
-              "products:partner-api scope, obtained under the login that uploaded the feed).",
-          ),
-          "the message must open with the historical startup error, verbatim",
+        assert.ok(err instanceof AuthRequiredError, "must be an AuthRequiredError");
+        assert.equal((err as Error).name, "AuthRequiredError");
+        // The message is the product: pinned verbatim, with both fixes in it.
+        assert.equal((err as Error).message, NOT_CONNECTED_MESSAGE);
+        assert.match((err as Error).message, /start_login/, "the in-chat fix must be named");
+        assert.match(
+          (err as Error).message,
+          /YANDEX_MERCHANTS_OAUTH_TOKEN/,
+          "the env fix must be named too",
         );
-        assert.match((err as Error).message, /restart the server/, "the fix must mention the restart");
         return true;
       },
     );
+    assert.ok(Date.now() - started < 500, "the answer must be immediate, not backed off");
     assert.equal(mock.calls.length, 0, "must not fetch at all — no retries, no backoff");
   } finally {
     mock.restore();
+    tempConfig.restore();
   }
 });
 
 test("a write without a token is rejected the same way, before fetch", async () => {
+  const tempConfig = withTempConfigDir();
   const mock = mockFetch(() => new Response("{}", { status: 200 }));
   try {
     const client = new MerchantsClient({ apiBase: BASE, maxRetries: 3, retryBaseMs: 0 });
     await assert.rejects(
       () => client.updateOfferPrices([{ feedId: 1, offerId: "x", price: 1 }]),
-      (err: unknown) => err instanceof CredentialsError,
+      (err: unknown) => err instanceof AuthRequiredError,
     );
     assert.equal(mock.calls.length, 0, "fetch must not be called without credentials");
   } finally {
     mock.restore();
+    tempConfig.restore();
+  }
+});
+
+/**
+ * The property the whole flow exists for: `finish_login` writes credentials to
+ * disk mid-session, and the very next call on the SAME client instance must pick
+ * them up — no new client, no restart. That only holds while the token is
+ * resolved per request, never cached on the instance.
+ */
+test("a login mid-session takes effect on the next call of the same client", async () => {
+  const tempConfig = withTempConfigDir();
+  const mock = mockFetch(() => new Response(JSON.stringify({ status: "OK", feeds: [] }), { status: 200 }));
+  try {
+    const client = new MerchantsClient({ apiBase: BASE, maxRetries: 0 });
+    await assert.rejects(() => client.feedsInfo(), AuthRequiredError);
+    assert.equal(mock.calls.length, 0);
+
+    // What finish_login does under the hood: persist the minted token.
+    writeCredentials({ access_token: "fresh-login", obtained_at: Date.now() });
+
+    const result = await client.feedsInfo();
+    assert.deepEqual(result, { status: "OK", feeds: [] });
+    const headers = mock.calls[0].init.headers as Record<string, string>;
+    assert.equal(headers.Authorization, "OAuth fresh-login", "the stored token must be used at once");
+  } finally {
+    mock.restore();
+    tempConfig.restore();
+  }
+});
+
+test("an env token wins over a stored login for every request", async () => {
+  const tempConfig = withTempConfigDir();
+  const mock = mockFetch(() => new Response(JSON.stringify({ status: "OK" }), { status: 200 }));
+  try {
+    writeCredentials({ access_token: "stored", obtained_at: Date.now() });
+    const client = new MerchantsClient({ token: "from-env", apiBase: BASE, maxRetries: 0 });
+    await client.feedsInfo();
+    const headers = mock.calls[0].init.headers as Record<string, string>;
+    assert.equal(headers.Authorization, "OAuth from-env");
+  } finally {
+    mock.restore();
+    tempConfig.restore();
+  }
+});
+
+/**
+ * A stored token can be revoked in Yandex ID long before its stated expiry, and
+ * only the API knows: a 401 gets one silent re-mint + replay. 403 deliberately
+ * does not — for this API it means a wrong login or rights not yet confirmed in
+ * Webmaster, which a fresh token of the same login cannot fix.
+ */
+test("a 401 on a stored token is refreshed once and the request is replayed", async () => {
+  const tempConfig = withTempConfigDir();
+  writeCredentials({ access_token: "revoked", refresh_token: "rt", obtained_at: Date.now() });
+  const apiCalls: string[] = [];
+  const mock = mockFetch((url, init) => {
+    if (url.startsWith("https://oauth.yandex.ru/token")) {
+      return new Response(
+        JSON.stringify({ access_token: "reborn", refresh_token: "rt2", expires_in: 3600 }),
+        { status: 200 },
+      );
+    }
+    apiCalls.push((init.headers as Record<string, string>).Authorization);
+    if (apiCalls.length === 1) return new Response("unauthorized", { status: 401 });
+    return new Response(JSON.stringify({ status: "OK", feeds: [] }), { status: 200 });
+  });
+  try {
+    const client = new MerchantsClient({ apiBase: BASE, maxRetries: 0 });
+    const result = await client.feedsInfo();
+    assert.deepEqual(result, { status: "OK", feeds: [] });
+    assert.deepEqual(apiCalls, ["OAuth revoked", "OAuth reborn"], "one replay with the re-minted token");
+  } finally {
+    mock.restore();
+    tempConfig.restore();
   }
 });

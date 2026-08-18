@@ -2,12 +2,26 @@
 
 For task-oriented guidance, open the [MCP capability catalog](./capabilities/index.md). This page remains the technical reference for schemas and API responses.
 
-This is a **write API**: besides the feeds-info wrappers every tool mutates state
-(prices, hidden offers). Inputs are normalized snake_case (`feed_id`, `offer_id`,
+This is a **write API**: besides the feeds-info wrappers and the local
+connection tools every tool mutates state (prices, hidden offers). Inputs are normalized snake_case (`feed_id`, `offer_id`,
 `ttl_in_hours`); the client maps them to the API's wire shape
 (`{ feed: { id }, id, price: { currencyId: "RUR", value, ... } }`,
 `{ hiddenOffers: [{ feedId, offerId, ttlInHours }] }`) and pins `currencyId` to
 `RUR` — the only currency the API accepts.
+
+## Connection & login
+
+| Tool | Description |
+|---|---|
+| `auth_status` | Whether a token is available, where it came from (`env` = `YANDEX_MERCHANTS_OAUTH_TOKEN`, `stored` = the in-chat login), when the stored token expires and where the credentials file lives. Local only — no network, and the token itself is never shown. |
+| `start_login` | First step of the in-chat login: returns a Yandex OAuth authorize URL (PKCE S256, `scope=products:partner-api`, no `client_secret` — public client). Show the URL to the user; they must open it **under the login that uploaded the YML feed** and bring back the confirmation code (valid 10 minutes, one-shot). |
+| `finish_login` | Second step: exchanges the confirmation code for tokens, stores them in `~/.config/mcp-yandex-merchants/credentials.json` (mode `0600`) and verifies with a live `GET /feeds-info`. `feedsVisible: 0` almost always means a wrong-login token. Takes effect immediately — no client restart. |
+| `logout` | Deletes the stored credentials file. Never touches `YANDEX_MERCHANTS_OAUTH_TOKEN`; the app grant itself stays active until revoked in Yandex ID. |
+
+The token is resolved per request: `YANDEX_MERCHANTS_OAUTH_TOKEN` wins when set,
+otherwise the stored login is used (and refreshed on expiry / after a 401).
+With neither source, data tools answer with an `AuthRequiredError` message that
+names both fixes.
 
 ## Feeds & diagnostics (read-only)
 
@@ -57,7 +71,8 @@ Notes:
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `YANDEX_MERCHANTS_OAUTH_TOKEN` | yes | — | Yandex OAuth token with the `products:partner-api` scope, obtained under the login that uploaded the feed. Treat it as a secret. |
+| `YANDEX_MERCHANTS_OAUTH_TOKEN` | no | — | Yandex OAuth token with the `products:partner-api` scope, obtained under the login that uploaded the feed. Optional since the in-chat login exists; when set it wins over the stored login and is never refreshed or deleted by the server. Treat it as a secret. |
+| `YANDEX_MERCHANTS_OAUTH_CLIENT_ID` | no | the A1 public client | ClientID of your own OAuth app for the in-chat login (Redirect URI must be `https://oauth.yandex.ru/verification_code`). |
 | `YANDEX_MERCHANTS_BASE_URL` | no | `https://yandex.ru/products/api/ext/partner` | API root override. |
 | `YANDEX_MERCHANTS_TIMEOUT_MS` | no | `60000` | Per-request timeout, ms. |
 | `YANDEX_MERCHANTS_MAX_RETRIES` | no | `3` | Retries: 429 always; 5xx/network for GET only (writes are never replayed). |
