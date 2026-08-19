@@ -1,11 +1,11 @@
-# Яндекс Товары MCP
+# <img src="./assets/a1-logo.svg" alt="A1" width="40"> Яндекс Товары MCP
 
 [![npm](https://img.shields.io/npm/v/mcp-yandex-merchants)](https://www.npmjs.com/package/mcp-yandex-merchants)
 [![CI](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml/badge.svg)](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml)
 [![Glama](https://glama.ai/mcp/servers/A1-x-Tech/mcp-yandex-merchants/badges/score.svg)](https://glama.ai/mcp/servers/A1-x-Tech/mcp-yandex-merchants)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-**Яндекс Товары MCP** подключает AI-приложение к партнёрскому API [Яндекс Товаров](https://merchants.yandex.ru). Можно обычными словами менять цены, скидки и видимость отдельных товаров — без редактирования и повторной загрузки всего YML-фида. Подключение начинается прямо в диалоге: не нужно заранее создавать токен или редактировать конфигурацию.
+**A1 Яндекс Товары MCP** подключает AI-приложение к партнёрскому API [Яндекс Товаров](https://merchants.yandex.ru). Можно обычными словами менять цены, скидки и видимость отдельных товаров — без редактирования и повторной загрузки всего YML-фида. Подключение начинается прямо в диалоге: не нужно заранее создавать токен или редактировать конфигурацию.
 
 - **13 готовых действий.** Подключение аккаунта прямо из диалога, проверка доступа, список фидов, цены, скидки, скрытие и возврат товаров, а также прямой вызов остальных методов API.
 - **Для одного товара и больших списков.** За один запрос можно изменить цены у 2 000 товаров или скрыть и вернуть до 500 товаров.
