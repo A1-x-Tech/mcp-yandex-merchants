@@ -62,9 +62,11 @@
 
 **Через интерфейс приложения:**
 
-1. Откройте **Settings → Plugins → MCP servers**.
+1. Откройте **Settings → MCP servers**.
 2. Нажмите **Add server**.
-3. Добавьте команду запуска `npx -y mcp-yandex-merchants@latest`.
+3. Выберите **STDIO**, затем укажите команду запуска `npx -y mcp-yandex-merchants@latest`.
+
+4. Нажмите **Save**, затем **Restart**.
 
 **Через командную строку:**
 
@@ -110,7 +112,9 @@ claude mcp list
 
 <br>
 
-Откройте **Settings → Developer → Edit Config** и добавьте сервер в `claude_desktop_config.json`:
+Актуальный официальный путь — **Settings → Extensions**. Для пользовательского desktop extension откройте **Advanced settings → Extension Developer → Install Extension…**, выберите файл `.mcpb` и следуйте подсказкам.
+
+Этот репозиторий сейчас публикует npm-пакет со stdio и пока не содержит `.mcpb`. Поэтому используйте приведённый ниже JSON stdio-конфиг как fallback только в сборках Claude Desktop, где ещё поддерживается локальная конфигурация:
 
 ```json
 {
@@ -123,14 +127,11 @@ claude mcp list
 }
 ```
 
-Если кнопки **Edit Config** нет, откройте файл напрямую:
-
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+В таких сборках сохраните его в `~/Library/Application Support/Claude/claude_desktop_config.json` на macOS или `%APPDATA%\Claude\claude_desktop_config.json` на Windows.
 
 После сохранения перезапустите Claude Desktop, откройте новый диалог и попросите подключить Яндекс Товары.
 
-[Документация Claude Desktop](https://claude.com/docs/connectors/building/mcp-apps/getting-started)
+[Документация Claude Desktop](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop)
 
 </details>
 
