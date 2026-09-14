@@ -1,8 +1,8 @@
 # <img src="./assets/a1-logo.svg" alt="A1" width="40"> Яндекс Товары MCP
 
 [![npm](https://img.shields.io/npm/v/mcp-yandex-merchants)](https://www.npmjs.com/package/mcp-yandex-merchants)
-[![CI](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml/badge.svg)](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml)
 [![Glama](https://glama.ai/mcp/servers/A1-x-Tech/mcp-yandex-merchants/badges/score.svg)](https://glama.ai/mcp/servers/A1-x-Tech/mcp-yandex-merchants)
+[![CI](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml/badge.svg)](https://github.com/A1-x-Tech/mcp-yandex-merchants/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 **A1 Яндекс Товары MCP** подключает AI-приложение к партнёрскому API [Яндекс Товаров](https://merchants.yandex.ru). Можно обычными словами менять цены, скидки и видимость отдельных товаров — без редактирования и повторной загрузки всего YML-фида. Подключение начинается прямо в диалоге: не нужно заранее создавать токен или редактировать конфигурацию.
