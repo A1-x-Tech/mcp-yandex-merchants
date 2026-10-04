@@ -1,0 +1,22 @@
+{
+  "name": "mcp-yandex-merchants",
+  "displayName": "A1 Яндекс Товары MCP",
+  "description": "MCP-сервер для Яндекс Товаров — менять цены, скидки и видимость товаров без пересборки и повторной загрузки YML-фида",
+  "author": {
+    "name": "Aleksandr Kovalko & Zinnur Temerbekov"
+  },
+  "homepage": "https://github.com/A1-x-Tech/mcp-yandex-merchants#readme",
+  "repository": "https://github.com/A1-x-Tech/mcp-yandex-merchants",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "yandex",
+    "yandex-merchants",
+    "yandex-products",
+    "e-commerce",
+    "product-feed",
+    "price-management"
+  ],
+  "logo": "assets/a1-logo.svg"
+}

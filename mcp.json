@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "yandex-merchants": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-yandex-merchants@latest"
+      ]
+    }
+  }
+}
